@@ -255,6 +255,36 @@ function renderAdd(id, prefill) {
     goTo('inventory');
   });
 
+  document.getElementById('scanCoverBtn').addEventListener('click', () => {
+    document.getElementById('coverPhotoInput').click();
+  });
+  document.getElementById('coverPhotoInput').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('coverOcrStatus');
+    statusEl.innerHTML = '<p>Reading cover text… this can take 10-20 seconds the first time.</p>';
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const cleaned = text.trim();
+      statusEl.innerHTML = cleaned
+        ? `<p class="muted">Extracted text — review it, then copy anything useful into the fields above:</p><pre>${escapeHtml(cleaned)}</pre>`
+        : '<p class="muted">No text detected — try a clearer, well-lit, straight-on photo.</p>';
+
+      const issueMatch = cleaned.match(/#\s?(\d+)/);
+      if (issueMatch && !document.getElementById('f-details').value) {
+        document.getElementById('f-details').value = 'Issue #' + issueMatch[1];
+      }
+      if (!document.getElementById('f-title').value) {
+        const bestLine = cleaned.split('\n').map(l => l.trim())
+          .filter(l => l.length > 3 && !/^#?\d/.test(l))
+          .sort((a, b) => b.length - a.length)[0];
+        if (bestLine) document.getElementById('f-title').value = bestLine;
+      }
+    } catch (err) {
+      statusEl.innerHTML = `<p class="error">OCR failed: ${err.message}</p>`;
+    }
+  });
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const item = {
