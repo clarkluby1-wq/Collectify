@@ -143,11 +143,20 @@ async function renderInventory() {
       let items = data.items || [];
       if (q && categoryFilter.value) items = items.filter(i => i.category === categoryFilter.value);
       listEl.innerHTML = items.length ? items.map(itemRowHtml).join('') : '<p class="muted">No items found.</p>';
-      listEl.querySelectorAll('[data-edit-id]').forEach(el =>
-        el.addEventListener('click', () => {
-          const item = items.find(i => i.id === el.dataset.editId);
+
+      listEl.querySelectorAll('.item-row').forEach(row => {
+        enableSwipeToDelete(row, () => {
+          const item = items.find(i => i.id === row.dataset.editId);
           renderAdd(item.id, item);
           setActiveTab('add');
+        });
+      });
+      listEl.querySelectorAll('[data-delete-id]').forEach(btn =>
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this item?')) return;
+          const res = await Api.remove(btn.dataset.deleteId);
+          if (!res.ok) return alert(res.error || 'Failed to delete item.');
+          refresh();
         }));
     } catch (err) {
       listEl.innerHTML = `<p class="error">${err.message}</p>`;
@@ -161,14 +170,59 @@ async function renderInventory() {
 
 function itemRowHtml(item) {
   return `
-    <div class="item-row" data-edit-id="${item.id}">
-      ${item.coverImageUrl ? `<img src="${item.coverImageUrl}" alt="">` : '<div class="cover-placeholder"></div>'}
-      <div>
-        <div class="item-title">${escapeHtml(item.title)}</div>
-        <div class="muted">${escapeHtml(item.creator || '')}</div>
-        <div class="muted small">${escapeHtml(item.category)} · ${escapeHtml(item.format || '')}</div>
+    <div class="item-row-wrap">
+      <button class="item-row-delete" data-delete-id="${item.id}">Delete</button>
+      <div class="item-row" data-edit-id="${item.id}">
+        ${item.coverImageUrl ? `<img src="${item.coverImageUrl}" alt="">` : '<div class="cover-placeholder"></div>'}
+        <div>
+          <div class="item-title">${escapeHtml(item.title)}</div>
+          <div class="muted">${escapeHtml(item.creator || '')}</div>
+          <div class="muted small">${escapeHtml(item.category)} · ${escapeHtml(item.format || '')}</div>
+        </div>
       </div>
     </div>`;
+}
+
+let openSwipeRow = null;
+
+function enableSwipeToDelete(row, onTap) {
+  const OPEN_X = -80;
+  let startX = 0, dx = 0, dragging = false, moved = false;
+
+  function closeRow(r) { r.style.transform = 'translateX(0)'; }
+
+  row.addEventListener('pointerdown', e => {
+    if (openSwipeRow && openSwipeRow !== row) closeRow(openSwipeRow);
+    dragging = true;
+    moved = false;
+    startX = e.clientX;
+    row.style.transition = 'none';
+  });
+
+  row.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    if (Math.abs(delta) > 6) moved = true;
+    dx = Math.min(0, Math.max(OPEN_X, delta));
+    row.style.transform = `translateX(${dx}px)`;
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    row.style.transition = 'transform 0.2s ease';
+    const settled = dx < OPEN_X / 2 ? OPEN_X : 0;
+    row.style.transform = `translateX(${settled}px)`;
+    openSwipeRow = settled === OPEN_X ? row : null;
+  }
+  row.addEventListener('pointerup', endDrag);
+  row.addEventListener('pointercancel', endDrag);
+  row.addEventListener('pointerleave', () => { if (dragging) endDrag(); });
+
+  row.addEventListener('click', () => {
+    if (moved) return;
+    onTap();
+  });
 }
 
 // ---------- Add / Edit ----------
