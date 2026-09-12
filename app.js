@@ -38,10 +38,28 @@ function renderScan() {
 function startScanner() {
   document.getElementById('startScanBtn').hidden = true;
   document.getElementById('stopScanBtn').hidden = false;
-  html5QrCode = new Html5Qrcode('reader');
+  html5QrCode = new Html5Qrcode('reader', {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ],
+    verbose: false
+  });
   html5QrCode.start(
     { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 250, height: 150 } },
+    {
+      fps: 10,
+      qrbox: { width: 280, height: 140 },
+      videoConstraints: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    },
     decodedText => {
       stopScanner();
       handleScannedCode(decodedText);
