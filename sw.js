@@ -1,4 +1,4 @@
-const CACHE = 'collectify-v3';
+const CACHE = 'collectify-v4';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'api.js', 'config.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
