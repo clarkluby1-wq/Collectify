@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#12141a">
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 <body>
 <header class="topbar">
@@ -70,6 +71,11 @@
       <label>Creator (author/artist/developer)<input id="f-creator"></label>
       <label>Details (issue #, edition, platform...)<input id="f-details"></label>
       <label>Barcode<input id="f-barcode" inputmode="numeric"></label>
+      <div class="cover-scan">
+        <input type="file" accept="image/*" capture="environment" id="coverPhotoInput" hidden>
+        <button type="button" id="scanCoverBtn" class="secondary-btn">📷 Read Cover Text (beta)</button>
+        <div id="coverOcrStatus"></div>
+      </div>
       <label>Format<input id="f-format" placeholder="Hardcover, Vinyl LP, Cartridge..."></label>
       <label>Condition
         <select id="f-condition">
