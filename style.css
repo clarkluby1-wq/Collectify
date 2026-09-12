@@ -67,9 +67,15 @@ input, select, textarea {
 .form-actions { display: flex; gap: 10px; margin-top: 8px; }
 
 .item-list { display: flex; flex-direction: column; gap: 8px; }
+.item-row-wrap { position: relative; overflow: hidden; border-radius: 10px; }
+.item-row-delete {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 80px;
+  background: var(--danger); color: white; border: none; font-weight: 600;
+}
 .item-row {
   display: flex; gap: 12px; align-items: center; background: var(--panel);
-  padding: 10px; border-radius: 10px; cursor: pointer;
+  padding: 10px; border-radius: 10px; cursor: pointer; position: relative;
+  touch-action: pan-y; user-select: none;
 }
 .item-row img, .cover-placeholder { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: #2a2e3a; flex-shrink: 0; }
 .item-title { font-weight: 600; }
