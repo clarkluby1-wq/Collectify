@@ -66,6 +66,13 @@ input, select, textarea {
 .item-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
 .form-actions { display: flex; gap: 10px; margin-top: 8px; }
 
+.cover-scan { display: flex; flex-direction: column; gap: 8px; }
+#coverOcrStatus pre {
+  white-space: pre-wrap; word-break: break-word; background: var(--panel);
+  border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px; font-size: 0.8rem;
+  max-height: 160px; overflow-y: auto;
+}
+
 .item-list { display: flex; flex-direction: column; gap: 8px; }
 .item-row-wrap { position: relative; overflow: hidden; border-radius: 10px; }
 .item-row-delete {
