@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Collectify</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#12141a">
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <h1>📦 Collectify</h1>
+  <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+</header>
+
+<main id="app"></main>
+
+<nav class="tabbar">
+  <button data-tab="scan" class="tab active">📷<span>Scan</span></button>
+  <button data-tab="inventory" class="tab">📚<span>Inventory</span></button>
+  <button data-tab="add" class="tab">➕<span>Add</span></button>
+</nav>
+
+<template id="tpl-scan">
+  <section class="panel">
+    <div id="reader"></div>
+    <button id="startScanBtn" class="primary-btn">Start Camera Scan</button>
+    <button id="stopScanBtn" class="secondary-btn" hidden>Stop</button>
+    <div class="or-divider">or</div>
+    <form id="manualBarcodeForm" class="inline-form">
+      <input id="manualBarcodeInput" type="text" inputmode="numeric" placeholder="Type barcode manually">
+      <button type="submit">Check</button>
+    </form>
+    <div id="scanResult"></div>
+  </section>
+</template>
+
+<template id="tpl-inventory">
+  <section class="panel">
+    <div class="inline-form">
+      <input id="searchInput" type="search" placeholder="Search title, creator, barcode...">
+      <select id="categoryFilter">
+        <option value="">All categories</option>
+        <option>Comics</option>
+        <option>Music</option>
+        <option>Books</option>
+        <option>VideoGames</option>
+      </select>
+    </div>
+    <div id="itemList" class="item-list"></div>
+  </section>
+</template>
+
+<template id="tpl-add">
+  <section class="panel">
+    <form id="itemForm" class="item-form">
+      <input type="hidden" id="itemId">
+      <label>Category
+        <select id="f-category" required>
+          <option value="Comics">Comics</option>
+          <option value="Music">Music (Records/CDs)</option>
+          <option value="Books">Books</option>
+          <option value="VideoGames">Video Games</option>
+        </select>
+      </label>
+      <label>Title<input id="f-title" required></label>
+      <label>Creator (author/artist/developer)<input id="f-creator"></label>
+      <label>Details (issue #, edition, platform...)<input id="f-details"></label>
+      <label>Barcode<input id="f-barcode" inputmode="numeric"></label>
+      <label>Format<input id="f-format" placeholder="Hardcover, Vinyl LP, Cartridge..."></label>
+      <label>Condition
+        <select id="f-condition">
+          <option value="">—</option>
+          <option>Mint</option>
+          <option>Near Mint</option>
+          <option>Very Good</option>
+          <option>Good</option>
+          <option>Fair</option>
+          <option>Poor</option>
+        </select>
+      </label>
+      <label>Purchase date<input id="f-purchaseDate" type="date"></label>
+      <label>Purchase price<input id="f-purchasePrice" type="number" step="0.01"></label>
+      <label>Cover image URL<input id="f-coverImageUrl"></label>
+      <label>Notes<textarea id="f-notes" rows="2"></textarea></label>
+      <div class="form-actions">
+        <button type="submit" class="primary-btn">Save to Collection</button>
+        <button type="button" id="deleteItemBtn" class="danger-btn" hidden>Delete</button>
+      </div>
+    </form>
+  </section>
+</template>
+
+<template id="tpl-settings">
+  <section class="panel">
+    <form id="settingsForm" class="item-form">
+      <label>Apps Script Web App URL
+        <input id="s-url" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <label>Shared secret
+        <input id="s-secret" placeholder="matches SHARED_SECRET script property">
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="primary-btn">Save Settings</button>
+      </div>
+    </form>
+    <p class="hint">See the project README for how to get these two values from your Google Apps Script deployment.</p>
+  </section>
+</template>
+
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+const app = document.getElementById('app');
+const tabs = document.querySelectorAll('.tab');
+let html5QrCode = null;
+let editingId = null;
+
+function render(tplId) {
+  app.innerHTML = '';
+  app.appendChild(document.getElementById(tplId).content.cloneNode(true));
+}
+
+function setActiveTab(name) {
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+}
+
+function goTo(tab) {
+  setActiveTab(tab);
+  if (tab === 'scan') return renderScan();
+  if (tab === 'inventory') return renderInventory();
+  if (tab === 'add') return renderAdd(null);
+  if (tab === 'settings') return renderSettings();
+}
+
+tabs.forEach(t => t.addEventListener('click', () => goTo(t.dataset.tab)));
+document.getElementById('settingsBtn').addEventListener('click', () => goTo('settings'));
+
+// ---------- Scan ----------
+function renderScan() {
+  render('tpl-scan');
+  document.getElementById('startScanBtn').addEventListener('click', startScanner);
+  document.getElementById('stopScanBtn').addEventListener('click', stopScanner);
+  document.getElementById('manualBarcodeForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const val = document.getElementById('manualBarcodeInput').value.trim();
+    if (val) handleScannedCode(val);
+  });
+}
+
+function startScanner() {
+  document.getElementById('startScanBtn').hidden = true;
+  document.getElementById('stopScanBtn').hidden = false;
+  html5QrCode = new Html5Qrcode('reader');
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    decodedText => {
+      stopScanner();
+      handleScannedCode(decodedText);
+    },
+    () => {}
+  ).catch(err => {
+    document.getElementById('scanResult').innerHTML =
+      `<p class="error">Camera error: ${err}. Try the manual barcode field, or check that this page is served over HTTPS (or localhost) with camera permission granted.</p>`;
+  });
+}
+
+function stopScanner() {
+  document.getElementById('startScanBtn').hidden = false;
+  document.getElementById('stopScanBtn').hidden = true;
+  if (html5QrCode) {
+    html5QrCode.stop().catch(() => {});
+    html5QrCode = null;
+  }
+}
+
+async function handleScannedCode(barcode) {
+  const resultEl = document.getElementById('scanResult');
+  resultEl.innerHTML = '<p>Checking your collection…</p>';
+  try {
+    const owned = await Api.getByBarcode(barcode);
+    if (owned.item) {
+      resultEl.innerHTML = ownedCardHtml(owned.item, barcode);
+      return;
+    }
+    resultEl.innerHTML = '<p>Not in your collection yet. Looking up details…</p>';
+    const lookup = await Api.lookupBarcode(barcode, '');
+    resultEl.innerHTML = notOwnedCardHtml(barcode, lookup.result);
+    document.getElementById('addFromScanBtn')?.addEventListener('click', () => {
+      renderAdd(null, { barcode, ...(lookup.result || {}) });
+      setActiveTab('add');
+    });
+  } catch (err) {
+    resultEl.innerHTML = `<p class="error">${err.message}</p>`;
+  }
+}
+
+function ownedCardHtml(item, barcode) {
+  return `
+    <div class="result-card owned">
+      <strong>✅ Already in your collection</strong>
+      ${item.coverImageUrl ? `<img src="${item.coverImageUrl}" alt="">` : ''}
+      <h3>${escapeHtml(item.title)}</h3>
+      <p>${escapeHtml(item.creator || '')}</p>
+      <p class="muted">${escapeHtml(item.category)} · ${escapeHtml(item.format || '')} · ${escapeHtml(item.condition || '')}</p>
+      <p class="muted">Barcode: ${escapeHtml(barcode)}</p>
+    </div>`;
+}
+
+function notOwnedCardHtml(barcode, meta) {
+  const title = meta && meta.title ? escapeHtml(meta.title) : '(no online match found)';
+  const creator = meta && meta.creator ? escapeHtml(meta.creator) : '';
+  const cover = meta && meta.coverImageUrl ? `<img src="${meta.coverImageUrl}" alt="">` : '';
+  return `
+    <div class="result-card not-owned">
+      <strong>🆕 Not in your collection</strong>
+      ${cover}
+      <h3>${title}</h3>
+      <p>${creator}</p>
+      <p class="muted">Barcode: ${escapeHtml(barcode)}</p>
+      <button id="addFromScanBtn" class="primary-btn">Add to Collection</button>
+    </div>`;
+}
+
+// ---------- Inventory ----------
+async function renderInventory() {
+  render('tpl-inventory');
+  const listEl = document.getElementById('itemList');
+  const searchInput = document.getElementById('searchInput');
+  const categoryFilter = document.getElementById('categoryFilter');
+
+  async function refresh() {
+    listEl.innerHTML = '<p>Loading…</p>';
+    try {
+      const q = searchInput.value.trim();
+      const data = q ? await Api.search(q) : await Api.list(categoryFilter.value);
+      let items = data.items || [];
+      if (q && categoryFilter.value) items = items.filter(i => i.category === categoryFilter.value);
+      listEl.innerHTML = items.length ? items.map(itemRowHtml).join('') : '<p class="muted">No items found.</p>';
+      listEl.querySelectorAll('[data-edit-id]').forEach(el =>
+        el.addEventListener('click', () => {
+          const item = items.find(i => i.id === el.dataset.editId);
+          renderAdd(item.id, item);
+          setActiveTab('add');
+        }));
+    } catch (err) {
+      listEl.innerHTML = `<p class="error">${err.message}</p>`;
+    }
+  }
+
+  searchInput.addEventListener('input', debounce(refresh, 300));
+  categoryFilter.addEventListener('change', refresh);
+  refresh();
+}
+
+function itemRowHtml(item) {
+  return `
+    <div class="item-row" data-edit-id="${item.id}">
+      ${item.coverImageUrl ? `<img src="${item.coverImageUrl}" alt="">` : '<div class="cover-placeholder"></div>'}
+      <div>
+        <div class="item-title">${escapeHtml(item.title)}</div>
+        <div class="muted">${escapeHtml(item.creator || '')}</div>
+        <div class="muted small">${escapeHtml(item.category)} · ${escapeHtml(item.format || '')}</div>
+      </div>
+    </div>`;
+}
+
+// ---------- Add / Edit ----------
+function renderAdd(id, prefill) {
+  render('tpl-add');
+  editingId = id || null;
+  const form = document.getElementById('itemForm');
+  const deleteBtn = document.getElementById('deleteItemBtn');
+
+  document.getElementById('itemId').value = id || '';
+  if (prefill) {
+    if (prefill.category) document.getElementById('f-category').value = prefill.category;
+    document.getElementById('f-title').value = prefill.title || '';
+    document.getElementById('f-creator').value = prefill.creator || '';
+    document.getElementById('f-details').value = prefill.details || '';
+    document.getElementById('f-barcode').value = prefill.barcode || '';
+    document.getElementById('f-format').value = prefill.format || '';
+    document.getElementById('f-condition').value = prefill.condition || '';
+    document.getElementById('f-purchaseDate').value = prefill.purchaseDate || '';
+    document.getElementById('f-purchasePrice').value = prefill.purchasePrice || '';
+    document.getElementById('f-coverImageUrl').value = prefill.coverImageUrl || '';
+    document.getElementById('f-notes').value = prefill.notes || '';
+  }
+
+  deleteBtn.hidden = !id;
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm('Delete this item?')) return;
+    const res = await Api.remove(id);
+    if (!res.ok) return alert(res.error || 'Failed to delete item.');
+    goTo('inventory');
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const item = {
+      category: document.getElementById('f-category').value,
+      title: document.getElementById('f-title').value,
+      creator: document.getElementById('f-creator').value,
+      details: document.getElementById('f-details').value,
+      barcode: document.getElementById('f-barcode').value,
+      format: document.getElementById('f-format').value,
+      condition: document.getElementById('f-condition').value,
+      purchaseDate: document.getElementById('f-purchaseDate').value,
+      purchasePrice: document.getElementById('f-purchasePrice').value,
+      coverImageUrl: document.getElementById('f-coverImageUrl').value,
+      notes: document.getElementById('f-notes').value
+    };
+    try {
+      const res = editingId ? await Api.update(editingId, item) : await Api.add(item);
+      if (!res.ok) return alert(res.error || 'Failed to save item.');
+      goTo('inventory');
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+}
+
+// ---------- Settings ----------
+function renderSettings() {
+  render('tpl-settings');
+  const { url, secret } = Api.cfg();
+  document.getElementById('s-url').value = url || '';
+  document.getElementById('s-secret').value = secret || '';
+  document.getElementById('settingsForm').addEventListener('submit', e => {
+    e.preventDefault();
+    localStorage.setItem('collectify_settings', JSON.stringify({
+      url: document.getElementById('s-url').value.trim(),
+      secret: document.getElementById('s-secret').value.trim()
+    }));
+    goTo('scan');
+  });
+}
+
+// ---------- Utils ----------
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+goTo('scan');
